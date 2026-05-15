@@ -1,0 +1,24 @@
+[Unit]
+Description=Observability Platform - WebSocket Broker
+After=postgresql.service network.target
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=observer
+Group=observer
+WorkingDirectory=/usr/local/bin
+Environment="NODE_ENV=production"
+Environment="WS_PORT=3000"
+Environment="JWT_SECRET=CHANGE_THIS_SECRET"
+Environment="DB_DSN=postgresql://observer@localhost/observability"
+EnvironmentFile=-/etc/default/websocket-broker
+ExecStart=/usr/bin/node /usr/local/bin/websocket_broker_secure.js
+Restart=always
+RestartSec=10
+WatchdogSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

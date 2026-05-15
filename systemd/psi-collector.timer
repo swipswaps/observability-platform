@@ -1,0 +1,11 @@
+[Unit]
+Description=Observability Platform - PSI Collector Timer
+Requires=psi-collector.service
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

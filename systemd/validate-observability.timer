@@ -1,0 +1,11 @@
+[Unit]
+Description=Observability Platform - Validation Timer
+Requires=validate-observability.service
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+AccuracySec=10min
+
+[Install]
+WantedBy=timers.target

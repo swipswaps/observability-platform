@@ -1,0 +1,226 @@
+=== PostgreSQL + TimescaleDB + SELinux Setup (Fri May 15 02:15:09 PM EDT 2026) ===
+Logging to: heal_postgresql.log
+
+[0/12] Prerequisites
+/usr/sbin/psql
+✓ Prerequisites met
+[1/12] Service
+✓ Running
+[2/12] Authentication
+✓ Password auth
+[3/12] Library Preload
+✓ Preload configured
+[4/12] Library Symlinks
+✓ Linked 3 TimescaleDB libs
+[5/12] Extension Files
+✓ Extension files linked
+[6/12] SELinux Contexts
+  Setting library contexts...
+    timescaledb-2.27.0.so: lib_t
+    timescaledb.so: lib_t
+    timescaledb-tsl-2.27.0.so: lib_t
+  Setting extension file contexts...
+✓ SELinux contexts set
+[7/12] SELinux Booleans (this may take 30-60 seconds)...
+  Setting postgresql_can_rsync...
+  Setting nis_enabled...
+✓ SELinux booleans configured
+[8/12] Database User
+✓ User exists
+[9/12] Database
+✓ Database exists
+[10/12] Extension
+✓ Extension loaded
+[11/12] Schema
+  Running migration_001_up.sql...
+psql:sql/migration_001_up.sql:4: NOTICE:  extension "timescaledb" already exists, skipping
+CREATE EXTENSION
+psql:sql/migration_001_up.sql:19: NOTICE:  relation "events" already exists, skipping
+CREATE TABLE
+psql:sql/migration_001_up.sql:21: NOTICE:  table "events" is already a hypertable, skipping
+  create_hypertable  
+---------------------
+ (1,public,events,f)
+(1 row)
+
+psql:sql/migration_001_up.sql:23: NOTICE:  relation "idx_events_host_time" already exists, skipping
+CREATE INDEX
+psql:sql/migration_001_up.sql:24: NOTICE:  relation "idx_events_type_time" already exists, skipping
+CREATE INDEX
+psql:sql/migration_001_up.sql:25: NOTICE:  relation "idx_events_severity_time" already exists, skipping
+CREATE INDEX
+psql:sql/migration_001_up.sql:26: NOTICE:  relation "idx_events_correlation" already exists, skipping
+CREATE INDEX
+psql:sql/migration_001_up.sql:31: NOTICE:  relation "schema_migrations" already exists, skipping
+CREATE TABLE
+INSERT 0 0
+✓ Schema ready
+[12/12] Verification
+✓ TimescaleDB 2.27.0 loaded
+
+✓ ALL CHECKS PASSED
+Log saved to: heal_postgresql.log
+++ date
++ echo '=== PostgreSQL + TimescaleDB + SELinux Setup (Fri May 15 02:17:43 PM EDT 2026) ==='
+=== PostgreSQL + TimescaleDB + SELinux Setup (Fri May 15 02:17:43 PM EDT 2026) ===
++ echo 'Logging to: heal_postgresql.log'
+Logging to: heal_postgresql.log
++ echo ''
+
++ echo '[0/12] Prerequisites'
+[0/12] Prerequisites
++ command -v psql
+/usr/sbin/psql
++ stat /usr/lib64/timescaledb-loader-pg18/timescaledb.so
+  File: /usr/lib64/timescaledb-loader-pg18/timescaledb.so
+  Size: 61240     	Blocks: 120        IO Block: 4096   regular file
+Device: 0,36	Inode: 7669406     Links: 1
+Access: (0755/-rwxr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
+Context: system_u:object_r:lib_t:s0
+Access: 2026-05-15 13:42:00.660893758 -0400
+Modify: 2026-05-12 09:32:44.000000000 -0400
+Change: 2026-05-15 13:04:00.481630093 -0400
+ Birth: 2026-05-15 13:04:00.478630113 -0400
++ stat /var/lib/pgsql/data/PG_VERSION
+  File: /var/lib/pgsql/data/PG_VERSION
+  Size: 3         	Blocks: 8          IO Block: 4096   regular file
+Device: 0,36	Inode: 7667085     Links: 1
+Access: (0600/-rw-------)  Uid: (   26/postgres)   Gid: (   26/postgres)
+Context: unconfined_u:object_r:postgresql_db_t:s0
+Access: 2026-05-15 11:25:33.505212808 -0400
+Modify: 2026-05-15 11:25:33.435777879 -0400
+Change: 2026-05-15 11:25:33.435777879 -0400
+ Birth: 2026-05-15 11:25:33.435213138 -0400
++ echo '✓ Prerequisites met'
+✓ Prerequisites met
++ echo '[1/12] Service'
+[1/12] Service
++ systemctl is-active postgresql
+active
++ sudo systemctl status postgresql --no-pager -l
++ head -20
+● postgresql.service - PostgreSQL database server
+     Loaded: loaded (/usr/lib/systemd/system/postgresql.service; disabled; preset: disabled)
+    Drop-In: /usr/lib/systemd/system/service.d
+             └─10-timeout-abort.conf
+     Active: active (running) since Fri 2026-05-15 13:42:01 EDT; 35min ago
+ Invocation: db7b10297f3d4d5aa485ec0ee467f198
+    Process: 745744 ExecStartPre=/usr/libexec/postgresql-check-db-dir postgresql (code=exited, status=0/SUCCESS)
+   Main PID: 745747 (postgres)
+      Tasks: 12 (limit: 18139)
+     Memory: 47.6M (peak: 62M, swap: 1M, swap peak: 1M)
+        CPU: 5.822s
+     CGroup: /system.slice/postgresql.service
+             ├─745747 /usr/bin/postgres -D /var/lib/pgsql/data
+             ├─745749 "postgres: logger "
+             ├─745750 "postgres: io worker 0"
+             ├─745751 "postgres: io worker 1"
+             ├─745752 "postgres: io worker 2"
+             ├─745753 "postgres: checkpointer "
+             ├─745754 "postgres: background writer "
+             ├─745757 "postgres: walwriter "
++ echo '✓ Running'
+✓ Running
++ echo '[2/12] Authentication'
+[2/12] Authentication
++ echo '  Current pg_hba.conf auth methods:'
+  Current pg_hba.conf auth methods:
++ sudo grep -E '^host' /var/lib/pgsql/data/pg_hba.conf
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256
+host    replication     all             127.0.0.1/32            scram-sha-256
+host    replication     all             ::1/128                 scram-sha-256
+host    observability    observer    127.0.0.1/32    scram-sha-256
++ sudo grep -q 'host.*all.*all.*127.0.0.1/32.*scram-sha-256' /var/lib/pgsql/data/pg_hba.conf
++ echo '✓ Password auth'
+✓ Password auth
++ echo '[3/12] Library Preload'
+[3/12] Library Preload
++ echo '  Current shared_preload_libraries:'
+  Current shared_preload_libraries:
++ sudo grep '^shared_preload_libraries' /var/lib/pgsql/data/postgresql.conf
+shared_preload_libraries = 'timescaledb'
++ sudo grep -q '^shared_preload_libraries.*timescaledb' /var/lib/pgsql/data/postgresql.conf
++ echo '✓ Preload configured'
+✓ Preload configured
++ echo '[4/12] Library Symlinks'
+[4/12] Library Symlinks
++ echo '  Finding TimescaleDB libraries...'
+  Finding TimescaleDB libraries...
++ sudo find /usr/lib64 -path '*/timescaledb*/*.so' -ls
+  7669406     60 -rwxr-xr-x   1 root     root        61240 May 12 09:32 /usr/lib64/timescaledb-loader-pg18/timescaledb.so
+  7669472    936 -rwxr-xr-x   1 root     root       956968 May 12 09:31 /usr/lib64/timescaledb-pg18/timescaledb-2.27.0.so
+  7669473    944 -rwxr-xr-x   1 root     root       963848 May 12 09:31 /usr/lib64/timescaledb-pg18/timescaledb-tsl-2.27.0.so
++ sudo mkdir -p /usr/lib64/pgsql
+++ sudo find /usr/lib64 -path '*/timescaledb*/*.so'
++ for sofile in $(sudo find /usr/lib64 -path "*/timescaledb*/*.so")
+++ basename /usr/lib64/timescaledb-loader-pg18/timescaledb.so
++ basename=timescaledb.so
++ target=/usr/lib64/pgsql/timescaledb.so
++ [[ ! -f /usr/lib64/pgsql/timescaledb.so ]]
++ for sofile in $(sudo find /usr/lib64 -path "*/timescaledb*/*.so")
+++ basename /usr/lib64/timescaledb-pg18/timescaledb-2.27.0.so
++ basename=timescaledb-2.27.0.so
++ target=/usr/lib64/pgsql/timescaledb-2.27.0.so
++ [[ ! -f /usr/lib64/pgsql/timescaledb-2.27.0.so ]]
++ for sofile in $(sudo find /usr/lib64 -path "*/timescaledb*/*.so")
+++ basename /usr/lib64/timescaledb-pg18/timescaledb-tsl-2.27.0.so
++ basename=timescaledb-tsl-2.27.0.so
++ target=/usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
++ [[ ! -f /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so ]]
++ echo '  Final state:'
+  Final state:
++ ls -la /usr/lib64/pgsql/timescaledb-2.27.0.so /usr/lib64/pgsql/timescaledb.so /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
+lrwxrwxrwx. 1 root root 49 May 15 13:57 /usr/lib64/pgsql/timescaledb-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-2.27.0.so
+lrwxrwxrwx. 1 root root 49 May 15 13:41 /usr/lib64/pgsql/timescaledb.so -> /usr/lib64/timescaledb-loader-pg18/timescaledb.so
+lrwxrwxrwx. 1 root root 53 May 15 13:57 /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-tsl-2.27.0.so
+++ wc -l
+++ ls /usr/lib64/pgsql/timescaledb-2.27.0.so /usr/lib64/pgsql/timescaledb.so /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
++ echo '✓ Linked 3 TimescaleDB libs'
+✓ Linked 3 TimescaleDB libs
++ echo '[5/12] Extension Files'
+[5/12] Extension Files
++ sudo mkdir -p /usr/share/pgsql/extension
++ [[ ! -f /usr/share/pgsql/extension/timescaledb.control ]]
++ [[ ! -f /usr/share/pgsql/extension/timescaledb--2.27.0.sql ]]
++ echo '✓ Extension files linked'
+✓ Extension files linked
++ echo '[6/12] SELinux Contexts'
+[6/12] SELinux Contexts
++ command -v getenforce
+++ getenforce
++ [[ Enforcing != Disabled ]]
+++ getenforce
++ echo '  SELinux status: Enforcing'
+  SELinux status: Enforcing
++ echo '  Current library contexts:'
+  Current library contexts:
++ ls -laZ /usr/lib64/pgsql/timescaledb-2.27.0.so /usr/lib64/pgsql/timescaledb.so /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 49 May 15 13:57 /usr/lib64/pgsql/timescaledb-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-2.27.0.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 49 May 15 13:41 /usr/lib64/pgsql/timescaledb.so -> /usr/lib64/timescaledb-loader-pg18/timescaledb.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 53 May 15 13:57 /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-tsl-2.27.0.so
++ echo '  Setting library contexts...'
+  Setting library contexts...
++ for sofile in /usr/lib64/pgsql/timescaledb*.so
++ [[ -L /usr/lib64/pgsql/timescaledb-2.27.0.so ]]
++ sudo chcon -h system_u:object_r:lib_t:s0 /usr/lib64/pgsql/timescaledb-2.27.0.so
++ ls -laZ /usr/lib64/pgsql/timescaledb-2.27.0.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 49 May 15 13:57 /usr/lib64/pgsql/timescaledb-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-2.27.0.so
++ for sofile in /usr/lib64/pgsql/timescaledb*.so
++ [[ -L /usr/lib64/pgsql/timescaledb.so ]]
++ sudo chcon -h system_u:object_r:lib_t:s0 /usr/lib64/pgsql/timescaledb.so
++ ls -laZ /usr/lib64/pgsql/timescaledb.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 49 May 15 13:41 /usr/lib64/pgsql/timescaledb.so -> /usr/lib64/timescaledb-loader-pg18/timescaledb.so
++ for sofile in /usr/lib64/pgsql/timescaledb*.so
++ [[ -L /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so ]]
++ sudo chcon -h system_u:object_r:lib_t:s0 /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
++ ls -laZ /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so
+lrwxrwxrwx. 1 root root system_u:object_r:lib_t:s0 53 May 15 13:57 /usr/lib64/pgsql/timescaledb-tsl-2.27.0.so -> /usr/lib64/timescaledb-pg18/timescaledb-tsl-2.27.0.so
++ echo '  Setting extension file contexts...'
+  Setting extension file contexts...
++ sudo chcon -R -t usr_t /usr/share/pgsql/extension/timescaledb--2.10.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.13.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.13.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.16.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.16.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.4--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.22.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.22.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.23.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.23.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.24.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.4--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.27.0--2.26.4.sql /usr/share/pgsql/extension/timescaledb--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb.control
++ head -3
++ ls -laZ /usr/share/pgsql/extension/timescaledb--2.10.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.10.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.11.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.12.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.13.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.13.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.14.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.15.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.16.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.16.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.17.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.18.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.19.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.20.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.21.4--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.22.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.22.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.23.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.23.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.24.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.25.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.26.4--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.27.0--2.26.4.sql /usr/share/pgsql/extension/timescaledb--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.0--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.1--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.2--2.27.0.sql /usr/share/pgsql/extension/timescaledb--2.9.3--2.27.0.sql /usr/share/pgsql/extension/timescaledb.control
+lrwxrwxrwx. 1 root root unconfined_u:object_r:usr_t:s0 59 May 15 13:52 /usr/share/pgsql/extension/timescaledb--2.10.0--2.27.0.sql -> /usr/lib64/timescaledb-pg18/timescaledb--2.10.0--2.27.0.sql
+lrwxrwxrwx. 1 root root unconfined_u:object_r:usr_t:s0 59 May 15 13:52 /usr/share/pgsql/extension/timescaledb--2.10.1--2.27.0.sql -> /usr/lib64/timescaledb-pg18/timescaledb--2.10.1--2.27.0.sql
+lrwxrwxrwx. 1 root root unconfined_u:object_r:usr_t:s0 59 May 15 13:52 /usr/share/pgsql/extension/timescaledb--2.10.2--2.27.0.sql -> /usr/lib64/timescaledb-pg18/timescaledb--2.10.2--2.27.0.sql

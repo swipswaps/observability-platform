@@ -1,0 +1,16 @@
+[Unit]
+Description=Auto-remediation for observability platform
+After=postgresql.service network.target
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=owner
+WorkingDirectory=/home/owner/Documents/6a071452-7a18-83ea-93e2-9ada8c690423/observability-platform
+ExecStart=/usr/bin/bash /home/owner/Documents/6a071452-7a18-83ea-93e2-9ada8c690423/observability-platform/scripts/auto_remediate.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-remediate
+
+[Install]
+WantedBy=multi-user.target

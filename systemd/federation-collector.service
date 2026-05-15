@@ -1,0 +1,13 @@
+[Unit]
+Description=Observability Platform - Federation Collector
+After=postgresql.service network.target
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=observer
+Environment="LOCAL_DB_DSN=dbname=observability user=observer host=localhost"
+Environment="CENTRAL_DB_DSN=dbname=observability_central user=observer host=central.example.com"
+ExecStart=/usr/local/bin/federation_collector.sh
+StandardOutput=journal
+StandardError=journal

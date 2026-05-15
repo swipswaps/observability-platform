@@ -1,0 +1,11 @@
+[Unit]
+Description=Observability Platform - Config Drift Timer
+Requires=config-drift.service
+
+[Timer]
+OnBootSec=10min
+OnCalendar=daily
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

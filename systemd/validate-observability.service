@@ -1,0 +1,12 @@
+[Unit]
+Description=Observability Platform - Validation Suite
+After=postgresql.service journal-ingester.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+Environment="DB_DSN=dbname=observability user=observer"
+ExecStart=/usr/local/bin/validate_observability.sh
+StandardOutput=journal
+StandardError=journal

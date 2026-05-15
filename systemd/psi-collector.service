@@ -1,0 +1,12 @@
+[Unit]
+Description=Observability Platform - PSI Collector
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+Environment="DB_DSN=dbname=observability user=observer"
+ExecStart=/usr/local/bin/psi_collector.sh
+StandardOutput=journal
+StandardError=journal

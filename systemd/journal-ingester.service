@@ -1,0 +1,19 @@
+[Unit]
+Description=Observability Platform - Journal Ingester
+After=postgresql.service network.target
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=observer
+Group=observer
+Environment="DB_DSN=dbname=observability user=observer password=observer"
+ExecStart=/usr/bin/python3 /usr/local/bin/journal_ingester.py
+Restart=always
+RestartSec=10
+WatchdogSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

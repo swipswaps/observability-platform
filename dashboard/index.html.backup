@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observability Platform Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 8px;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #hud h1 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #4fc3f7;
+        }
+        
+        #stats {
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            color: #90caf9;
+        }
+        
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .critical {
+            color: #ef5350;
+        }
+        
+        .warning {
+            color: #ffb74d;
+        }
+        
+        .ok {
+            color: #66bb6a;
+        }
+        
+        #timeline {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 8px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #connection-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .connected {
+            color: #66bb6a;
+        }
+        
+        .disconnected {
+            color: #ef5350;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        
+        <div id="hud">
+            <h1>Observability Platform</h1>
+            <div id="stats">
+                <div class="stat-row">
+                    <span class="stat-label">Events/sec:</span>
+                    <span class="stat-value" id="events-rate">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">CPU Pressure:</span>
+                    <span class="stat-value ok" id="cpu-pressure">0.0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Memory Pressure:</span>
+                    <span class="stat-value ok" id="mem-pressure">0.0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">I/O Pressure:</span>
+                    <span class="stat-value ok" id="io-pressure">0.0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Critical Events:</span>
+                    <span class="stat-value critical" id="critical-count">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="connection-status">
+            <span class="disconnected" id="ws-status">⬤ Disconnected</span>
+        </div>
+        
+        <div id="timeline">
+            <canvas id="timeline-canvas"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0e27);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+        
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Add ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        // Add directional light
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // Create particle system for events
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 1000;
+        const posArray = new Float32Array(particlesCount * 3);
+        
+        for (let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 10;
+        }
+        
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.005,
+            color: 0x4fc3f7,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particlesMesh);
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate particle system
+            particlesMesh.rotation.x += 0.0005;
+            particlesMesh.rotation.y += 0.001;
+            
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+        
+        // WebSocket connection
+        const wsToken = 'YOUR_JWT_TOKEN_HERE'; // Replace with actual JWT
+        const wsUrl = `wss://${window.location.hostname}:3000/?token=${wsToken}`;
+        let ws;
+        let reconnectInterval = 5000;
+        
+        function connectWebSocket() {
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                document.getElementById('ws-status').textContent = '⬤ Connected';
+                document.getElementById('ws-status').className = 'connected';
+                console.log('WebSocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'events') {
+                    updateDashboard(data.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('ws-status').textContent = '⬤ Disconnected';
+                document.getElementById('ws-status').className = 'disconnected';
+                console.log('WebSocket disconnected, reconnecting...');
+                setTimeout(connectWebSocket, reconnectInterval);
+            };
+        }
+        
+        // Update dashboard with new events
+        function updateDashboard(events) {
+            // Update event rate
+            document.getElementById('events-rate').textContent = events.length;
+            
+            // Process events
+            events.forEach(event => {
+                if (event.event_type === 'psi') {
+                    updatePSIMetrics(event.raw_payload);
+                }
+                
+                if (event.severity === 'critical' || event.severity === 'error') {
+                    const criticalCount = parseInt(document.getElementById('critical-count').textContent);
+                    document.getElementById('critical-count').textContent = criticalCount + 1;
+                    
+                    // Add visual pulse effect
+                    pulseEffect();
+                }
+            });
+        }
+        
+        // Update PSI metrics
+        function updatePSIMetrics(payload) {
+            if (payload.cpu_some_avg10) {
+                const cpuPressure = payload.cpu_some_avg10.toFixed(1);
+                const cpuEl = document.getElementById('cpu-pressure');
+                cpuEl.textContent = `${cpuPressure}%`;
+                cpuEl.className = cpuPressure > 50 ? 'stat-value critical' : 'stat-value ok';
+            }
+            
+            if (payload.mem_some_avg10) {
+                const memPressure = payload.mem_some_avg10.toFixed(1);
+                const memEl = document.getElementById('mem-pressure');
+                memEl.textContent = `${memPressure}%`;
+                memEl.className = memPressure > 50 ? 'stat-value critical' : 'stat-value ok';
+            }
+            
+            if (payload.io_some_avg10) {
+                const ioPressure = payload.io_some_avg10.toFixed(1);
+                const ioEl = document.getElementById('io-pressure');
+                ioEl.textContent = `${ioPressure}%`;
+                ioEl.className = ioPressure > 50 ? 'stat-value critical' : 'stat-value ok';
+            }
+        }
+        
+        // Visual pulse effect for critical events
+        function pulseEffect() {
+            particlesMaterial.color.setHex(0xef5350);
+            setTimeout(() => {
+                particlesMaterial.color.setHex(0x4fc3f7);
+            }, 500);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Start WebSocket connection
+        connectWebSocket();
+    </script>
+</body>
+</html>

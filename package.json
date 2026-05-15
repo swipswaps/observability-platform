@@ -1,0 +1,9 @@
+{
+  "name": "observability-platform",
+  "version": "1.0.0",
+  "description": "Linux latency and failure monitoring system",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Observability Platform - Firefox GPU Monitor
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=observer
+Environment="DB_DSN=dbname=observability user=observer"
+ExecStart=/usr/local/bin/firefox_gpu_monitor.sh
+StandardOutput=journal
+StandardError=journal

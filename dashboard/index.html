@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observability Platform Dashboard</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-left: 4px solid #4CAF50; background: #2d2d2d; }
+        .error { border-left-color: #f44336; }
+        .warning { border-left-color: #ff9800; }
+        #events { max-height: 600px; overflow-y: auto; }
+        .event { padding: 5px; border-bottom: 1px solid #444; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #log { background: #000; color: #0f0; padding: 10px; max-height: 300px; overflow-y: auto; font-size: 11px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Observability Platform Dashboard</h1>
+        <div id="status" class="status">Initializing...</div>
+        
+        <h2>Console Log (all operations visible)</h2>
+        <div id="log"></div>
+        
+        <h2>Actions</h2>
+        <button onclick="connect()">Connect WebSocket</button>
+        <button onclick="authenticate()">Authenticate</button>
+        <button onclick="subscribe()">Subscribe to Events</button>
+        <button onclick="queryEvents()">Query Events</button>
+        <button onclick="disconnect()">Disconnect</button>
+        
+        <h2>Recent Events</h2>
+        <div id="events"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let authenticated = false;
+        
+        // Log every operation to both console and visible log div
+        function log(msg, level = 'info') {
+            const timestamp = new Date().toISOString();
+            const logMsg = `[${timestamp}] [${level}] ${msg}`;
+            
+            console.log(logMsg);
+            
+            const logDiv = document.getElementById('log');
+            const line = document.createElement('div');
+            line.textContent = logMsg;
+            line.style.color = level === 'error' ? '#f44' : level === 'warn' ? '#fa0' : '#0f0';
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function setStatus(msg, type = 'status') {
+            console.log('STATUS UPDATE:', msg, '| Type:', type);
+            log(`Status: ${msg} (${type})`, type === 'error' ? 'error' : 'info');
+            
+            const status = document.getElementById('status');
+            status.textContent = msg;
+            status.className = type;
+        }
+        
+        function connect() {
+            console.log('=== CONNECT INITIATED ===');
+            log('Initiating WebSocket connection...');
+            
+            const wsUrl = 'wss://localhost:8443';
+            console.log('Target URL:', wsUrl);
+            log(`Target: ${wsUrl}`);
+            
+            try {
+                console.log('Creating WebSocket object...');
+                ws = new WebSocket(wsUrl);
+                log('WebSocket object created');
+                
+                ws.onopen = (event) => {
+                    console.log('=== WEBSOCKET OPENED ===');
+                    console.log('Event:', event);
+                    log('✓ WebSocket connection established');
+                    setStatus('Connected - awaiting authentication', 'status');
+                };
+                
+                ws.onmessage = (event) => {
+                    console.log('=== MESSAGE RECEIVED ===');
+                    console.log('Raw data length:', event.data.length, 'bytes');
+                    console.log('First 200 chars:', event.data.substring(0, 200));
+                    log(`← Received ${event.data.length} bytes`);
+                    
+                    try {
+                        const msg = JSON.parse(event.data);
+                        console.log('Parsed message type:', msg.type);
+                        console.log('Full parsed object:', msg);
+                        log(`Message type: ${msg.type}`);
+                        
+                        switch(msg.type) {
+                            case 'auth_success':
+                                console.log('Authentication successful! Client ID:', msg.clientId);
+                                log(`✓ Authenticated as ${msg.clientId}`);
+                                authenticated = true;
+                                setStatus('Authenticated', 'status');
+                                break;
+                                
+                            case 'auth_error':
+                                console.error('Authentication failed:', msg.message);
+                                log(`✗ Auth failed: ${msg.message}`, 'error');
+                                setStatus('Authentication failed', 'error');
+                                break;
+                                
+                            case 'query_result':
+                                console.log('Query result received:', msg.count, 'events');
+                                console.log('Events:', msg.events);
+                                log(`✓ Query returned ${msg.count} events`);
+                                displayEvents(msg.events);
+                                break;
+                                
+                            case 'event_stream':
+                                console.log('Event stream received:', msg.count, 'events');
+                                log(`← Stream: ${msg.count} events`);
+                                displayEvents(msg.events);
+                                break;
+                                
+                            case 'subscribe_success':
+                                console.log('Subscription confirmed:', msg.subscriptions);
+                                log(`✓ Subscribed to: ${JSON.stringify(msg.subscriptions)}`);
+                                break;
+                                
+                            default:
+                                console.warn('Unknown message type:', msg.type);
+                                log(`⚠ Unknown type: ${msg.type}`, 'warn');
+                        }
+                    } catch (err) {
+                        console.error('JSON parse error:', err);
+                        console.error('Raw data that failed:', event.data);
+                        log(`✗ Parse error: ${err.message}`, 'error');
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('=== WEBSOCKET ERROR ===');
+                    console.error('Error object:', error);
+                    log(`✗ WebSocket error: ${error.type}`, 'error');
+                    setStatus('Connection error', 'error');
+                };
+                
+                ws.onclose = (event) => {
+                    console.log('=== WEBSOCKET CLOSED ===');
+                    console.log('Code:', event.code);
+                    console.log('Reason:', event.reason);
+                    console.log('Clean close:', event.wasClean);
+                    log(`Connection closed: ${event.code} ${event.reason}`);
+                    authenticated = false;
+                    setStatus('Disconnected', 'warning');
+                };
+                
+                console.log('WebSocket handlers registered');
+                log('Event handlers registered');
+                
+            } catch (err) {
+                console.error('=== CONNECTION EXCEPTION ===');
+                console.error('Error:', err);
+                console.error('Stack:', err.stack);
+                log(`✗ Exception: ${err.message}`, 'error');
+                setStatus('Connection failed: ' + err.message, 'error');
+            }
+        }
+        
+        function authenticate() {
+            console.log('=== AUTHENTICATE CALLED ===');
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('Cannot authenticate - WebSocket not open. State:', ws?.readyState);
+                log('✗ Cannot authenticate - not connected', 'error');
+                return;
+            }
+            
+            const token = 'demo-token-insecure';
+            const authMsg = {
+                type: 'auth',
+                token: token,
+                subscriptions: ['journal', 'psi', 'gpu_diagnostic']
+            };
+            
+            console.log('Sending auth message:', authMsg);
+            log(`→ Authenticating with subscriptions: ${authMsg.subscriptions.join(', ')}`);
+            
+            try {
+                ws.send(JSON.stringify(authMsg));
+                console.log('Auth message sent successfully');
+                log('Auth message sent');
+            } catch (err) {
+                console.error('Send failed:', err);
+                log(`✗ Send error: ${err.message}`, 'error');
+            }
+        }
+        
+        function subscribe() {
+            console.log('=== SUBSCRIBE CALLED ===');
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('Cannot subscribe - WebSocket not open');
+                log('✗ Cannot subscribe - not connected', 'error');
+                return;
+            }
+            
+            if (!authenticated) {
+                console.warn('Not authenticated yet');
+                log('⚠ Subscribe attempted before auth', 'warn');
+            }
+            
+            const subMsg = {
+                type: 'subscribe',
+                topics: ['journal', 'psi', 'firefox', 'gpu_diagnostic']
+            };
+            
+            console.log('Sending subscribe message:', subMsg);
+            log(`→ Subscribing to: ${subMsg.topics.join(', ')}`);
+            ws.send(JSON.stringify(subMsg));
+        }
+        
+        function queryEvents() {
+            console.log('=== QUERY EVENTS CALLED ===');
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('Cannot query - WebSocket not open. State:', ws?.readyState);
+                log('✗ Cannot query - not connected', 'error');
+                return;
+            }
+            
+            if (!authenticated) {
+                console.warn('Querying without authentication - may fail');
+                log('⚠ Query without auth', 'warn');
+            }
+            
+            const query = {
+                type: 'query',
+                filters: {
+                    limit: 100
+                }
+            };
+            
+            console.log('Sending query:', query);
+            log('→ Querying last 100 events');
+            
+            try {
+                ws.send(JSON.stringify(query));
+                console.log('Query sent');
+                log('Query sent');
+            } catch (err) {
+                console.error('Query send failed:', err);
+                log(`✗ Query error: ${err.message}`, 'error');
+            }
+        }
+        
+        function disconnect() {
+            console.log('=== DISCONNECT CALLED ===');
+            
+            if (!ws) {
+                console.log('No connection to close');
+                log('No active connection');
+                return;
+            }
+            
+            console.log('Closing WebSocket...');
+            log('Closing connection...');
+            ws.close();
+            ws = null;
+            authenticated = false;
+            console.log('WebSocket closed and nulled');
+            log('✓ Disconnected');
+        }
+        
+        function displayEvents(events) {
+            console.log('=== DISPLAY EVENTS CALLED ===');
+            console.log('Event count:', events?.length || 0);
+            
+            if (!events || events.length === 0) {
+                console.log('No events to display');
+                log('No events received');
+                return;
+            }
+            
+            const container = document.getElementById('events');
+            container.innerHTML = '';
+            log(`Displaying ${events.length} events...`);
+            
+            events.forEach((event, idx) => {
+                console.log(`Event ${idx}:`, event.event_type, '|', event.severity, '|', event.subsystem);
+                
+                const div = document.createElement('div');
+                div.className = 'event';
+                div.innerHTML = `
+                    <strong>${event.time}</strong> 
+                    [${event.severity || 'info'}] 
+                    ${event.subsystem || 'unknown'}/${event.event_type}: 
+                    ${event.message || '(no message)'}
+                `;
+                container.appendChild(div);
+            });
+            
+            console.log('All events rendered to DOM');
+            log(`✓ Rendered ${events.length} events`);
+        }
+        
+        // Initialize on load
+        console.log('===================================');
+        console.log('DASHBOARD INITIALIZED');
+        console.log('Timestamp:', new Date().toISOString());
+        console.log('User agent:', navigator.userAgent);
+        console.log('===================================');
+        log('Dashboard loaded and ready');
+        setStatus('Ready - click Connect to begin', 'status');
+    </script>
+</body>
+</html>
