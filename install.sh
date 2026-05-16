@@ -84,6 +84,16 @@ fi
 # Re-apply ownership now that observer OS user definitely exists
 sudo chown -R observer:observer /var/lib/observability
 sudo chown -R observer:observer /var/log/observability
+
+# Add observer to systemd-journal group so journalctl -f can read the journal.
+# Without this, journalctl exits immediately (rc=1), journal_ingester.py falls
+# through the for-loop, resets attempt=0 (no backoff), and spin-loops silently.
+if getent group systemd-journal &>/dev/null; then
+    sudo usermod -aG systemd-journal observer
+    echo "✓ observer added to systemd-journal group"
+else
+    echo "WARNING: systemd-journal group not found – journal ingester may fail" >&2
+fi
 echo ""
 
 # ============================================================
@@ -227,14 +237,22 @@ fi
 echo ""
 
 # ============================================================
-# NODE DEPENDENCIES
+# NODE DEPENDENCIES – installed globally
 # ============================================================
-echo "=== Installing Node Dependencies ==="
-if [[ -f "package.json" ]]; then
-    npm install
-else
-    echo "WARNING: package.json not found – skipping npm install" >&2
-fi
+# Local npm install puts node_modules/ in the repo working directory.
+# The websocket-broker service runs from WorkingDirectory=/usr/local/bin
+# where there is no node_modules/, so require('ws') fails with
+# MODULE_NOT_FOUND. Global install makes modules available system-wide
+# regardless of the process working directory.
+echo "=== Installing Node Dependencies (global) ==="
+# --prefix /usr/local ensures modules land in /usr/local/lib/node_modules
+# which is the path set in NODE_PATH in websocket-broker.service.
+# All three modules are required by websocket_broker_secure.js:
+#   ws          – WebSocket server
+#   jsonwebtoken – JWT auth
+#   pg           – PostgreSQL client (was missing, caused MODULE_NOT_FOUND after ws/jwt fixed)
+sudo npm install -g --prefix /usr/local ws jsonwebtoken pg
+echo "✓ Node packages installed globally to /usr/local/lib/node_modules"
 echo ""
 
 # ============================================================
@@ -286,12 +304,16 @@ shopt -u nullglob
 
 if [[ ${#SVC_FILES[@]} -gt 0 ]]; then
     sudo cp -v "${SVC_FILES[@]}" /etc/systemd/system/
+    # Fix SELinux context — units copied from user space carry user_home_t label
+    # which systemd (init_t) cannot read. restorecon relabels to systemd_unit_file_t.
+    sudo restorecon -v /etc/systemd/system/*.service 2>/dev/null || true
 else
     echo "WARNING: no .service files in systemd/ – skipping" >&2
 fi
 
 if [[ ${#TIMER_FILES[@]} -gt 0 ]]; then
     sudo cp -v "${TIMER_FILES[@]}" /etc/systemd/system/
+    sudo restorecon -v /etc/systemd/system/*.timer 2>/dev/null || true
 else
     echo "WARNING: no .timer files in systemd/ – skipping" >&2
 fi
@@ -322,6 +344,32 @@ enable_if_exists websocket-broker.service
 enable_if_exists dead-letter-replay.timer
 enable_if_exists validate-observability.timer
 
+echo ""
+
+# ============================================================
+# TLS CERTIFICATES – required by websocket-broker (wss://)
+# ============================================================
+echo "=== TLS Certificate Setup ==="
+TLS_DIR="/etc/observability/tls"
+sudo mkdir -p "$TLS_DIR"
+
+if [[ -f "$TLS_DIR/cert.pem" && -f "$TLS_DIR/key.pem" ]]; then
+    echo "✓ TLS certificates already exist – skipping generation"
+else
+    echo "Generating self-signed TLS certificate (365 days)..."
+    sudo openssl req -x509 -newkey rsa:4096 -nodes \
+        -keyout "$TLS_DIR/key.pem" \
+        -out "$TLS_DIR/cert.pem" \
+        -days 365 \
+        -subj "/CN=observability.local"
+    echo "✓ TLS certificate generated"
+fi
+
+# observer must be able to read the certs (websocket-broker runs as observer)
+sudo chown -R observer:observer "$TLS_DIR"
+sudo chmod 750 "$TLS_DIR"
+sudo chmod 640 "$TLS_DIR/key.pem" "$TLS_DIR/cert.pem"
+echo "✓ TLS directory ownership set to observer:observer"
 echo ""
 
 # ============================================================
