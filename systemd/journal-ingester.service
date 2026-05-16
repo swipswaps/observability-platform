@@ -7,13 +7,18 @@ Wants=postgresql.service
 Type=simple
 User=observer
 Group=observer
-Environment="DB_DSN=dbname=observability user=observer password=observer"
+Environment="DB_DSN=dbname=observability user=observer password=observer host=127.0.0.1"
 ExecStart=/usr/bin/python3 /usr/local/bin/journal_ingester.py
 Restart=always
 RestartSec=10
-WatchdogSec=30
 StandardOutput=journal
 StandardError=journal
+
+# WatchdogSec intentionally removed.
+# Reason: the Python script has no sd_notify(WATCHDOG=1) call.
+# With WatchdogSec=30, systemd sent SIGABRT to the entire process group
+# every 30 seconds — core-dumping both python3 and every journalctl child.
+# Restart=always handles genuine crashes without watchdog interference.
 
 [Install]
 WantedBy=multi-user.target
