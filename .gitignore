@@ -5,3 +5,5 @@ __pycache__/
 *.pyo
 /var/lib/observability/
 /tmp/install_run.log
+fix_firefox_contention_*.sh
+fix_firefox_contention_*.sh
